@@ -143,7 +143,7 @@ PROMPT;
      * @param string $prompt The prompt to send
      * @return string LLM-generated response
      */
-    private function callLLM(string $prompt): string {
+    protected function callLLM(string $prompt): string {
         $ch = curl_init($this->llmApiUrl);
 
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
