@@ -13,6 +13,8 @@ class PMAgent extends Agent
 
     protected string $stage = 'waiting_description'; // initial state
 
+    protected bool $pendingClarification = false;
+
     public function __construct(string $model, string $apiKey, string $llmAPIURL)
     {
         parent::__construct(
@@ -69,7 +71,7 @@ Here is additional context and clarifications collected so far:
 
 '.$memoryContext.'
 
-Provide a high-level plan with up to 10 steps, using clear language and separating frontend, backend, and data considerations where relevant.
+Provide a high-level plan with up to 10 steps to the user, using clear language and separating frontend, backend, and data considerations where relevant.
 ';
 
         return $this->callLLM($prompt);
@@ -194,6 +196,38 @@ Decide which agent should be involved next: Backend Developer, Frontend Develope
 
 
     /**
+     * Auxiliary function for interaction. Determines if additional information is required to move forward.
+     * This method enables a chat-like interface with progressive refinement.
+     *
+     * @param string $userInput
+     * @return string
+     */
+
+    private function needsMoreInfo(string $stage, string $userInput): array
+    {
+        $contextSummary = $this->summarizeMemoryForLLM('PM', 'Create an application for the user.'); // or just get memory directly
+        $prompt = "You are a product manager agent. The user has provided the following context:\n\n"
+                . $contextSummary
+                . "\n\nCurrent stage: $stage\n"
+                . "User just said: \"$userInput\"\n\n"
+                . "Is the information provided so far enough to proceed to the next step in the process? "
+                . "Reply with 'yes' if it's enough, or 'no' followed by what is missing in a way that is friendly and a general user will understand.";
+
+        $response = $this->callLLM($prompt);
+
+        if (stripos($response, 'yes') !== false) {
+            return ['proceed' => true, 'message' => null];
+        }
+
+        return [
+            'proceed' => false,
+            'message' => $response
+        ];
+    }
+
+
+
+    /**
      * Handles user input and responds based on current interaction stage.
      * This method enables a chat-like interface with progressive refinement.
      *
@@ -202,23 +236,37 @@ Decide which agent should be involved next: Backend Developer, Frontend Develope
      */
     public function interact(string $userInput): string
     {
-        // First input: initial product idea
+        // If we are waiting for more info from the user, store this input and retry logic
+        if ($this->pendingClarification) {
+            $this->addToMemory("Additional Clarification: $userInput");
+            $this->pendingClarification = false;
+
+            // Re-evaluate this input after storing clarification
+            return $this->interact($userInput);
+        }
+
+        // Check if more info is needed before proceeding with the current stage
+        $validation = $this->needsMoreInfo($this->stage, $userInput, $this->memory);
+        if (!$validation['proceed']) {
+            $this->pendingClarification = true;
+            return $validation['message'];  // Ask the user to provide more information
+        }
+
+        // === Stage 1: Initial product idea ===
         if ($this->stage === 'waiting_description') {
             $this->addToMemory("Product Idea: $userInput");
             $this->stage = 'asking_clarifications';
-
             return $this->askForClarifications($userInput);
         }
 
-        // Second stage: user answered clarifications
+        // === Stage 2: Answering clarifications ===
         if ($this->stage === 'asking_clarifications') {
             $this->addToMemory("User Clarifications: $userInput");
             $this->stage = 'planning';
-
             return $this->planDevelopment($this->getProductIdeaFromMemory());
         }
 
-        // Third stage: offer to generate user stories
+        // === Stage 3: Planning done, ask if user wants stories ===
         if ($this->stage === 'planning') {
             if (stripos($userInput, 'yes') !== false) {
                 $this->stage = 'stories_generated';
@@ -226,11 +274,11 @@ Decide which agent should be involved next: Backend Developer, Frontend Develope
                 $this->storeUserStories($stories);
                 return $stories . "\n\nWould you like me to export these stories to a Jira-compatible CSV file?";
             } else {
-                return "Okay, let me know when you'd like to proceed with user stories.";
+                return "Okay, let me know when you'd like to proceed with generating user stories.";
             }
         }
 
-        // Fourth stage: export to CSV
+        // === Stage 4: Exporting stories ===
         if ($this->stage === 'stories_generated') {
             if (stripos($userInput, 'yes') !== false) {
                 $filename = "stories_" . time() . ".csv";
@@ -244,6 +292,7 @@ Decide which agent should be involved next: Backend Developer, Frontend Develope
 
         return "I'm ready to continue when you are!";
     }
+
 
     /**
      * Gets the first product idea from memory.
