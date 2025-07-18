@@ -1,7 +1,7 @@
 # PHPAgentFramework
 
 **Lightweight PHP framework for building modular AI agents powered by LLMs.**  
-Designed to help you prototype and simulate intelligent agents that can reason, plan, collaborate, and act using capabilities, tools, and memory — all from PHP.
+Designed to help you prototype and simulate intelligent agents that can reason, plan, collaborate, and act using capabilities, tools, and memory — all in PHP.
 
 ---
 
