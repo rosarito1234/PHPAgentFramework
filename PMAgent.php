@@ -211,7 +211,7 @@ Decide which agent should be involved next: Backend Developer, Frontend Develope
                 . "\n\nCurrent stage: $stage\n"
                 . "User just said: \"$userInput\"\n\n"
                 . "Is the information provided so far enough to proceed to the next step in the process? "
-                . "Reply with 'yes' if it's enough, or 'no' followed by what is missing in a way that is friendly and a general user will understand.";
+                . "Reply with 'yes' if it's enough, or 'I would like some additional information please. ' followed by what is missing in a way that is friendly and a general user will understand.";
 
         $response = $this->callLLM($prompt);
 
@@ -224,6 +224,26 @@ Decide which agent should be involved next: Backend Developer, Frontend Develope
             'message' => $response
         ];
     }
+
+    /**
+     * Handles user input and responds on user intention to continue to next step. 
+     * This method enables a chat-like interface with progressive refinement.
+     *
+     * @param string $userInput
+     * @return string
+     */
+    protected function userWantsToProceed(string $context, string $userInput): bool
+    {
+        $prompt = "You are helping interpret a user's intent in a product development conversation.\n"
+                . "Context: $context\n"
+                . "User said: \"$userInput\"\n\n"
+                . "Based on this, does the user want to proceed? Respond only with YES or NO.";
+    
+        $response = $this->callLLM($prompt);
+    
+        return stripos($response, 'YES') !== false;
+    }
+
 
 
 
@@ -268,7 +288,7 @@ Decide which agent should be involved next: Backend Developer, Frontend Develope
 
         // === Stage 3: Planning done, ask if user wants stories ===
         if ($this->stage === 'planning') {
-            if (stripos($userInput, 'yes') !== false) {
+            if ($this->userWantsToProceed("Generate user stories", $userInput)) {
                 $this->stage = 'stories_generated';
                 $stories = $this->generateUserStories($this->getProductIdeaFromMemory());
                 $this->storeUserStories($stories);
@@ -280,7 +300,7 @@ Decide which agent should be involved next: Backend Developer, Frontend Develope
 
         // === Stage 4: Exporting stories ===
         if ($this->stage === 'stories_generated') {
-            if (stripos($userInput, 'yes') !== false) {
+            if ($this->userWantsToProceed("Export user stories to CSV", $userInput)) {
                 $filename = "stories_" . time() . ".csv";
                 $result = $this->exportUserStoriesToCSV($this->getLastUserStoriesFromMemory(), $filename);
                 $this->stage = 'completed';
