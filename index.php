@@ -3,56 +3,111 @@
 <head>
   <meta charset="UTF-8">
   <title>Product Manager Agent Chat</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <style>
-    body { font-family: sans-serif; max-width: 600px; margin: 2rem auto; }
-    #chat { border: 1px solid #ccc; padding: 1rem; min-height: 200px; }
-    .msg { margin-bottom: 1rem; }
-    .user { font-weight: bold; }
-    .agent { color: darkblue; }
+    body {
+      background-color: #f8f9fa;
+      font-family: 'Segoe UI', sans-serif;
+    }
+
+    .container {
+      max-width: 700px;
+      margin-top: 50px;
+    }
+
+    .chat-box {
+      background: white;
+      border-radius: 12px;
+      padding: 20px;
+      box-shadow: 0 0 10px rgba(0,0,0,0.1);
+      height: 450px;
+      overflow-y: auto;
+      margin-bottom: 20px;
+    }
+
+    .msg {
+      margin-bottom: 1rem;
+    }
+
+    .user {
+      font-weight: bold;
+    }
+
+    .agent {
+      color: #0d6efd;
+    }
+
+    .typing {
+      font-style: italic;
+      color: gray;
+      margin-bottom: 1rem;
+    }
   </style>
 </head>
 <body>
-  <h2>Product Manager Agent</h2>
-  <div id="chat"></div>
 
-  <form id="chatForm">
-    <input type="text" id="message" placeholder="Type your message..." style="width: 80%;" />
-    <button type="submit">Send</button>
+<div class="container">
+  <h3 class="text-center mb-4">Product Manager Agent</h3>
+  <div id="chat" class="chat-box"></div>
+
+  <form id="chatForm" class="input-group">
+    <input type="text" id="message" class="form-control" placeholder="Type your message..." required autocomplete="off">
+    <button type="submit" class="btn btn-primary">Send</button>
   </form>
+</div>
 
-  <script>
-    const chatForm = document.getElementById('chatForm');
-    const chatBox = document.getElementById('chat');
+<script>
+  const chatForm = document.getElementById('chatForm');
+  const chatBox = document.getElementById('chat');
+  const input = document.getElementById('message');
 
-    chatForm.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const input = document.getElementById('message');
-      const msg = input.value.trim();
-      if (!msg) return;
+  function appendMessage(sender, text) {
+    const div = document.createElement('div');
+    div.classList.add('msg');
+    div.innerHTML = `<span class="${sender === 'You' ? 'user' : 'agent'}">${sender}:</span> ${text}`;
+    chatBox.appendChild(div);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
 
-      appendMessage('You', msg);
-      input.value = '';
+  function showTyping() {
+    const typing = document.createElement('div');
+    typing.id = 'typing';
+    typing.classList.add('typing');
+    typing.textContent = 'Agent is typing...';
+    chatBox.appendChild(typing);
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
 
-      const response = await fetch('chat_pm.php', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'message=' + encodeURIComponent(msg)
-      });
+  function removeTyping() {
+    const typing = document.getElementById('typing');
+    if (typing) typing.remove();
+  }
 
-      const data = await response.json();
-      appendMessage('Agent', data.response);
+  chatForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = input.value.trim();
+    if (!msg) return;
+
+    appendMessage('You', msg);
+    input.value = '';
+    input.focus();
+
+    showTyping();
+
+    const response = await fetch('chat_pm.php', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: 'message=' + encodeURIComponent(msg)
     });
 
-    function appendMessage(sender, text) {
-      const div = document.createElement('div');
-      div.classList.add('msg');
-      div.innerHTML = `<span class="${sender === 'You' ? 'user' : 'agent'}">${sender}:</span> ${text}`;
-      chatBox.appendChild(div);
-      chatBox.scrollTop = chatBox.scrollHeight;
-    }
+    const data = await response.json();
+    removeTyping();
+    appendMessage('Agent', data.response);
+  });
 
-    // Initial welcome message
-    appendMessage('Agent', 'Hi! What would you like to develop?');
-  </script>
+  // Initial welcome message
+  appendMessage('Agent', 'Hi! What would you like to develop?');
+</script>
+
 </body>
 </html>
